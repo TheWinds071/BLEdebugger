@@ -10,20 +10,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 @Composable
 fun DebugScreen(controller: BleController) {
@@ -39,6 +38,16 @@ fun DebugScreen(controller: BleController) {
         (quickHeaderBytes + quickBodyBytes + quickFooterBytes).toHexString().ifBlank { "--" }
     } else {
         "格式错误"
+    }
+    val incomingMessage = controller.incomingMessageDialog
+
+    LaunchedEffect(incomingMessage) {
+        if (incomingMessage != null) {
+            delay(2800)
+            if (controller.incomingMessageDialog == incomingMessage) {
+                controller.dismissIncomingMessageDialog()
+            }
+        }
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -73,24 +82,15 @@ fun DebugScreen(controller: BleController) {
                     modifier = Modifier.weight(1f),
                     enabled = selectedDevice != null && supportsGatt && !controller.isGattConnected,
                     shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    colors = appFilledButtonColors()
                 ) { Text("连接") }
                 OutlinedButton(
                     onClick = { controller.disconnectGatt() },
                     modifier = Modifier.weight(1f),
                     enabled = controller.isGattConnected,
                     shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onSurface
-                    ),
-                    border = ButtonDefaults.outlinedButtonBorder(enabled = controller.isGattConnected).copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.outline)
-                    )
+                    colors = appOutlinedButtonColors(),
+                    border = appOutlinedButtonBorder(enabled = controller.isGattConnected)
                 ) { Text("断开") }
             }
             StatusLine("浏览特征", controller.selectedCharacteristicSummary ?: "--")
@@ -103,28 +103,14 @@ fun DebugScreen(controller: BleController) {
                 SegmentedButton(
                     selected = controller.sendMode == SendMode.Hex,
                     onClick = { controller.sendMode = SendMode.Hex },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    colors = SegmentedButtonDefaults.colors(
-                        activeContainerColor = MaterialTheme.colorScheme.primary,
-                        activeContentColor = MaterialTheme.colorScheme.onPrimary,
-                        inactiveContainerColor = MaterialTheme.colorScheme.surface,
-                        inactiveContentColor = MaterialTheme.colorScheme.onSurface,
-                        activeBorderColor = MaterialTheme.colorScheme.primary,
-                        inactiveBorderColor = MaterialTheme.colorScheme.outline
-                    )
+                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    colors = appSegmentedButtonColors()
                 ) { Text("Hex") }
                 SegmentedButton(
                     selected = controller.sendMode == SendMode.Utf8,
                     onClick = { controller.sendMode = SendMode.Utf8 },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    colors = SegmentedButtonDefaults.colors(
-                        activeContainerColor = MaterialTheme.colorScheme.primary,
-                        activeContentColor = MaterialTheme.colorScheme.onPrimary,
-                        inactiveContainerColor = MaterialTheme.colorScheme.surface,
-                        inactiveContentColor = MaterialTheme.colorScheme.onSurface,
-                        activeBorderColor = MaterialTheme.colorScheme.primary,
-                        inactiveBorderColor = MaterialTheme.colorScheme.outline
-                    )
+                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    colors = appSegmentedButtonColors()
                 ) { Text("UTF-8") }
             }
             OutlinedTextField(
@@ -135,58 +121,29 @@ fun DebugScreen(controller: BleController) {
                 placeholder = { Text(if (controller.sendMode == SendMode.Hex) "写入数据（Hex）" else "写入数据（UTF-8）") },
                 singleLine = true,
                 shape = RoundedCornerShape(18.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                )
+                colors = appOutlinedFieldColors()
             )
             Button(
                 onClick = { controller.writeSelectedCharacteristic() },
                 modifier = Modifier.fillMaxWidth(),
-                    enabled = controller.canWriteSelectedCharacteristic,
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                ) { Text("写入") }
+                enabled = controller.canWriteSelectedCharacteristic,
+                shape = RoundedCornerShape(18.dp),
+                colors = appFilledButtonColors()
+            ) { Text("写入") }
         }
         SectionCard(title = "快捷发送", subtitle = "自定义包头和包尾") {
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 SegmentedButton(
                     selected = controller.quickBodyMode == SendMode.Hex,
                     onClick = { controller.quickBodyMode = SendMode.Hex },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    colors = SegmentedButtonDefaults.colors(
-                        activeContainerColor = MaterialTheme.colorScheme.primary,
-                        activeContentColor = MaterialTheme.colorScheme.onPrimary,
-                        inactiveContainerColor = MaterialTheme.colorScheme.surface,
-                        inactiveContentColor = MaterialTheme.colorScheme.onSurface,
-                        activeBorderColor = MaterialTheme.colorScheme.primary,
-                        inactiveBorderColor = MaterialTheme.colorScheme.outline
-                    )
+                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    colors = appSegmentedButtonColors()
                 ) { Text("正文 Hex") }
                 SegmentedButton(
                     selected = controller.quickBodyMode == SendMode.Utf8,
                     onClick = { controller.quickBodyMode = SendMode.Utf8 },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    colors = SegmentedButtonDefaults.colors(
-                        activeContainerColor = MaterialTheme.colorScheme.primary,
-                        activeContentColor = MaterialTheme.colorScheme.onPrimary,
-                        inactiveContainerColor = MaterialTheme.colorScheme.surface,
-                        inactiveContentColor = MaterialTheme.colorScheme.onSurface,
-                        activeBorderColor = MaterialTheme.colorScheme.primary,
-                        inactiveBorderColor = MaterialTheme.colorScheme.outline
-                    )
+                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    colors = appSegmentedButtonColors()
                 ) { Text("正文 UTF-8") }
             }
             OutlinedTextField(
@@ -197,17 +154,7 @@ fun DebugScreen(controller: BleController) {
                 placeholder = { Text("AA 55") },
                 singleLine = true,
                 shape = RoundedCornerShape(18.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                )
+                colors = appOutlinedFieldColors()
             )
             OutlinedTextField(
                 value = controller.quickBody,
@@ -217,17 +164,7 @@ fun DebugScreen(controller: BleController) {
                 placeholder = { Text(if (controller.quickBodyMode == SendMode.Hex) "01 03 00 00 00 02" else "010300000002") },
                 singleLine = true,
                 shape = RoundedCornerShape(18.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                )
+                colors = appOutlinedFieldColors()
             )
             OutlinedTextField(
                 value = controller.quickFooter,
@@ -237,17 +174,7 @@ fun DebugScreen(controller: BleController) {
                 placeholder = { Text("0D 0A") },
                 singleLine = true,
                 shape = RoundedCornerShape(18.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                )
+                colors = appOutlinedFieldColors()
             )
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("组包预览", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -262,24 +189,15 @@ fun DebugScreen(controller: BleController) {
                     modifier = Modifier.weight(1f),
                     enabled = controller.canWriteSelectedCharacteristic,
                     shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onSurface
-                    ),
-                    border = ButtonDefaults.outlinedButtonBorder(enabled = controller.canWriteSelectedCharacteristic).copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.outline)
-                    )
+                    colors = appOutlinedButtonColors(),
+                    border = appOutlinedButtonBorder(enabled = controller.canWriteSelectedCharacteristic)
                 ) { Text("填入直接写入") }
                 Button(
                     onClick = { controller.sendQuickPayload() },
                     modifier = Modifier.weight(1f),
                     enabled = controller.canWriteSelectedCharacteristic,
                     shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiary,
-                        contentColor = MaterialTheme.colorScheme.onTertiary,
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    colors = appFilledButtonColors()
                 ) { Text("快捷发送") }
             }
         }
@@ -295,6 +213,26 @@ fun DebugScreen(controller: BleController) {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun IncomingMessageBanner(message: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 6.dp,
+        shadowElevation = 6.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text("收到消息", fontWeight = FontWeight.Bold)
+            Text(message, maxLines = 4, overflow = TextOverflow.Ellipsis)
         }
     }
 }

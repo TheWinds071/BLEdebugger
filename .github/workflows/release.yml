@@ -35,6 +35,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -81,6 +83,29 @@ jobs:
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Resolve release notes
+        id: notes
+        shell: bash
+        env:
+          TAG_NAME: ${{ steps.meta.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
+
+          PREVIOUS_TAG="$(git tag --sort=-creatordate | grep -Fxv "$TAG_NAME" | head -n 1 || true)"
+
+          {
+            echo "## 更新内容"
+            echo
+            if [[ -n "$PREVIOUS_TAG" ]]; then
+              git log --no-merges --pretty=format:'- %s (%h)' "${PREVIOUS_TAG}..${GITHUB_SHA}"
+            else
+              git log --no-merges --pretty=format:'- %s (%h)' -n 20 "${GITHUB_SHA}"
+            fi
+          } > "$NOTES_FILE"
+
+          echo "body_path=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -88,7 +113,7 @@ jobs:
           name: ${{ steps.meta.outputs.release_name }}
           target_commitish: ${{ github.sha }}
           prerelease: ${{ steps.meta.outputs.prerelease }}
-          generate_release_notes: true
+          body_path: ${{ steps.notes.outputs.body_path }}
           files: app/build/outputs/apk/release/*.apk
 
       - name: Clean signing keystore

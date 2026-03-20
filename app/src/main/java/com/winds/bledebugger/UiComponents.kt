@@ -6,14 +6,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -108,3 +112,46 @@ fun StatusLine(label: String, value: String) {
         Text(value, fontWeight = FontWeight.SemiBold)
     }
 }
+
+@Composable
+fun appFilledButtonColors() = ButtonDefaults.buttonColors(
+    containerColor = MaterialTheme.colorScheme.primaryContainer,
+    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+)
+
+@Composable
+fun appOutlinedButtonColors() = ButtonDefaults.outlinedButtonColors(
+    contentColor = MaterialTheme.colorScheme.primary,
+    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+)
+
+@Composable
+fun appOutlinedButtonBorder(enabled: Boolean) =
+    ButtonDefaults.outlinedButtonBorder(enabled = enabled).copy(
+        brush = SolidColor(MaterialTheme.colorScheme.outline)
+    )
+
+@Composable
+fun appOutlinedFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    cursorColor = MaterialTheme.colorScheme.primary,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+)
+
+@Composable
+fun appSegmentedButtonColors() = SegmentedButtonDefaults.colors(
+    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    inactiveContainerColor = MaterialTheme.colorScheme.surface,
+    inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    activeBorderColor = MaterialTheme.colorScheme.primary,
+    inactiveBorderColor = MaterialTheme.colorScheme.outline
+)

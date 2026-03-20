@@ -58,6 +58,18 @@
 
 APK 构建成功后可在默认输出目录中找到调试包。
 
+## 发布
+
+仓库内置了 GitHub Actions 发布流程，文件位于 `.github/workflows/release.yml`。
+
+- 推送 `v*` 格式的 tag 会自动构建 `release APK` 并创建 GitHub Release
+- 手动触发工作流时，可以直接填写发布标题和是否为预发布
+- Release 页面中的“更新内容”会自动从 commit 历史生成
+- 如果仓库里已经有旧 tag，工作流会提取“上一个 tag 到当前发布 commit”之间的提交
+- 如果这是第一次发布，工作流会回退到最近 20 条非 merge commit 作为更新内容
+
+建议保持每次发版前的 commit message 简洁、可读，因为 Release 页面会直接展示这些提交标题。
+
 ## 调试流程
 
 1. 打开应用，进入设备页

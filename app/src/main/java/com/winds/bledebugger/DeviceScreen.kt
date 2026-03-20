@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -65,13 +64,15 @@ fun DeviceScreen(
                     Button(
                         onClick = onRequestPermissions,
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(18.dp)
+                        shape = RoundedCornerShape(18.dp),
+                        colors = appFilledButtonColors()
                     ) { Text("授权蓝牙") }
                 } else if (!controller.isBluetoothEnabled) {
                     Button(
                         onClick = onRequestEnableBluetooth,
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(18.dp)
+                        shape = RoundedCornerShape(18.dp),
+                        colors = appFilledButtonColors()
                     ) { Text("打开蓝牙") }
                 } else {
                     Button(
@@ -80,9 +81,7 @@ fun DeviceScreen(
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (controller.isScanning) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
-                        )
+                        colors = appFilledButtonColors()
                     ) {
                         Text(if (controller.isScanning) "停止扫描" else "开始扫描")
                     }
@@ -90,14 +89,18 @@ fun DeviceScreen(
                 OutlinedButton(
                     onClick = { controller.clearResults() },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(18.dp)
+                    shape = RoundedCornerShape(18.dp),
+                    colors = appOutlinedButtonColors(),
+                    border = appOutlinedButtonBorder(enabled = true)
                 ) { Text("清空列表") }
             }
             if (!controller.isLocationEnabled) {
                 OutlinedButton(
                     onClick = { controller.openLocationSettings() },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp)
+                    shape = RoundedCornerShape(18.dp),
+                    colors = appOutlinedButtonColors(),
+                    border = appOutlinedButtonBorder(enabled = true)
                 ) { Text("打开定位服务") }
             }
             StatusLine("权限", if (controller.hasRequiredPermissions()) "已授权" else "未授权")
@@ -139,11 +142,16 @@ fun DeviceScreen(
                     onClick = {
                         controller.selectDevice(device)
                         pendingDevice = null
-                    }
+                    },
+                    colors = appFilledButtonColors()
                 ) { Text("连接") }
             },
             dismissButton = {
-                OutlinedButton(onClick = { pendingDevice = null }) { Text("取消") }
+                OutlinedButton(
+                    onClick = { pendingDevice = null },
+                    colors = appOutlinedButtonColors(),
+                    border = appOutlinedButtonBorder(enabled = true)
+                ) { Text("取消") }
             }
         )
     }

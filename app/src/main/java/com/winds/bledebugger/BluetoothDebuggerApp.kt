@@ -6,10 +6,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -53,6 +57,7 @@ import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.winds.bledebugger.ui.theme.BLEdebuggerTheme
+import kotlinx.coroutines.delay
 
 @Composable
 fun BluetoothDebuggerApp() {
@@ -65,6 +70,9 @@ fun BluetoothDebuggerApp() {
     val deviceScrollState = rememberScrollState()
     val debugScrollState = rememberScrollState()
     val logScrollState = rememberScrollState()
+    val bannerAnimationDuration = 220
+    var bannerMessage by remember { mutableStateOf<String?>(null) }
+    var bannerVisible by remember { mutableStateOf(false) }
 
     DisposableEffect(bleController) {
         bleController.startObserving()
@@ -96,6 +104,25 @@ fun BluetoothDebuggerApp() {
         snapshotFlow { activeScrollState.value }.collect { current ->
             showBottomBar = current <= previous || current < 8
             previous = current
+        }
+    }
+
+    LaunchedEffect(currentTab, bleController.incomingMessageDialog) {
+        val incomingMessage = bleController.incomingMessageDialog
+        if (currentTab == 1 && incomingMessage != null) {
+            bannerMessage = incomingMessage
+            bannerVisible = true
+        } else {
+            bannerVisible = false
+        }
+    }
+
+    LaunchedEffect(bannerVisible, bannerMessage) {
+        if (!bannerVisible && bannerMessage != null) {
+            delay(bannerAnimationDuration.toLong())
+            if (!bannerVisible) {
+                bannerMessage = null
+            }
         }
     }
 
@@ -161,6 +188,20 @@ fun BluetoothDebuggerApp() {
         }
 
         AnimatedVisibility(
+            visible = bannerVisible,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            enter = topBannerEnter(durationMillis = bannerAnimationDuration),
+            exit = topBannerExit(durationMillis = bannerAnimationDuration)
+        ) {
+            bannerMessage?.let { message ->
+                IncomingMessageBanner(message = message)
+            }
+        }
+
+        AnimatedVisibility(
             visible = showBottomBar,
             modifier = Modifier.align(Alignment.BottomCenter),
             enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn(),
@@ -173,6 +214,18 @@ fun BluetoothDebuggerApp() {
         }
     }
 }
+
+private fun topBannerEnter(durationMillis: Int): EnterTransition =
+    slideInHorizontally(
+        animationSpec = tween(durationMillis = durationMillis),
+        initialOffsetX = { it }
+    ) + fadeIn(animationSpec = tween(durationMillis = durationMillis))
+
+private fun topBannerExit(durationMillis: Int): ExitTransition =
+    slideOutHorizontally(
+        animationSpec = tween(durationMillis = durationMillis),
+        targetOffsetX = { -it }
+    ) + fadeOut(animationSpec = tween(durationMillis = durationMillis))
 
 @Composable
 fun StandardBottomBar(

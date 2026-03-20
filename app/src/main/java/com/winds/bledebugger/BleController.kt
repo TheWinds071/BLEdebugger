@@ -84,6 +84,8 @@ class BleController(private val context: Context) {
         private set
     var lastGattValue by mutableStateOf<String?>(null)
         private set
+    var incomingMessageDialog by mutableStateOf<String?>(null)
+        private set
     var lastTxValue by mutableStateOf<String?>(null)
         private set
     var lastWriteError by mutableStateOf<String?>(null)
@@ -234,6 +236,7 @@ class BleController(private val context: Context) {
         ) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 lastGattValue = formatReceivedValue(value)
+                incomingMessageDialog = lastGattValue
                 appendLog("RX", "读取 ${shortUuid(characteristic.uuid.toString())}: ${value.toHexString()}")
             } else {
                 appendLog("ERR", "读取失败，status=$status")
@@ -246,6 +249,7 @@ class BleController(private val context: Context) {
             value: ByteArray
         ) {
             lastGattValue = formatReceivedValue(value)
+            incomingMessageDialog = lastGattValue
             appendLog("NTF", "通知 ${shortUuid(characteristic.uuid.toString())}: ${value.toHexString()}")
         }
 
@@ -584,6 +588,10 @@ class BleController(private val context: Context) {
         if (logs.size > 100) logs.removeAt(0)
     }
 
+    fun dismissIncomingMessageDialog() {
+        incomingMessageDialog = null
+    }
+
     @SuppressLint("MissingPermission")
     private fun updateScanResult(result: ScanResult) {
         upsertResult(
@@ -757,6 +765,7 @@ class BleController(private val context: Context) {
         readCharacteristicId = null
         notifyEnabled = false
         lastGattValue = null
+        incomingMessageDialog = null
         lastTxValue = null
         lastWriteError = null
         currentMtu = 23
