@@ -22,7 +22,10 @@ import androidx.compose.ui.unit.sp
 fun MetricCard(title: String, value: String, description: String) {
     Card(
         shape = RoundedCornerShape(30.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
@@ -48,7 +51,10 @@ fun SectionCard(
 ) {
     Card(
         shape = RoundedCornerShape(30.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+            contentColor = MaterialTheme.colorScheme.onSurface
+        )
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -79,7 +85,8 @@ fun LogRow(time: String, type: String, content: String) {
 fun StatusChip(text: String) {
     Surface(
         shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f)
+        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f),
+        contentColor = MaterialTheme.colorScheme.tertiary
     ) {
         Text(
             text = text,

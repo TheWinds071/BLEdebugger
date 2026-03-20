@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.winds.bledebugger.ui.theme.BLEdebuggerTheme
@@ -186,7 +187,8 @@ fun StandardBottomBar(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface
     ) {
         Row(
             modifier = Modifier
@@ -230,6 +232,20 @@ fun StandardBottomBar(
 @Composable
 fun BluetoothDebuggerPreview() {
     BLEdebuggerTheme {
+        BluetoothDebuggerApp()
+    }
+}
+
+@Preview(
+    name = "Dark",
+    showBackground = true,
+    showSystemUi = true,
+    device = Devices.PIXEL_6,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+fun BluetoothDebuggerDarkPreview() {
+    BLEdebuggerTheme(darkTheme = true, dynamicColor = false) {
         BluetoothDebuggerApp()
     }
 }

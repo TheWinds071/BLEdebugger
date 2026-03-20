@@ -90,11 +90,16 @@ class BleController(private val context: Context) {
         private set
     var writePayload by mutableStateOf("")
     var sendMode by mutableStateOf(SendMode.Hex)
+    var quickHeader by mutableStateOf("")
+    var quickBody by mutableStateOf("")
+    var quickFooter by mutableStateOf("")
+    var quickBodyMode by mutableStateOf(SendMode.Hex)
     var currentMtu by mutableStateOf(23)
         private set
     var isGattConnected by mutableStateOf(false)
         private set
     private var pendingWriteChunks = ArrayDeque<ByteArray>()
+    private var pendingWriteDisplayValue: String? = null
 
     val selectedCharacteristicSummary: String?
         get() = gattCharacteristics.firstOrNull { it.id == selectedCharacteristicId }?.let {
@@ -166,6 +171,14 @@ class BleController(private val context: Context) {
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+            if (status != BluetoothGatt.GATT_SUCCESS) {
+                appendLog("ERR", "GATT 连接状态异常，status=$status, newState=$newState")
+                if (this@BleController.gatt === gatt) {
+                    clearGattState()
+                }
+                gatt.close()
+                return
+            }
             when (newState) {
                 BluetoothGatt.STATE_CONNECTED -> {
                     this@BleController.gatt = gatt
@@ -196,10 +209,17 @@ class BleController(private val context: Context) {
                 updateGattCharacteristics(gatt)
                 appendLog("GATT", "服务发现完成，共 ${gatt.services.size} 个服务")
                 gatt.requestMtu(247)
-                if (autoEnableNotifyPending && notifyCharacteristicId != null && !notifyEnabled) {
+                if (notifyCharacteristicId != null && !notifyEnabled) {
                     autoEnableNotifyPending = false
                     toggleNotifications()
+                } else {
+                    autoEnableNotifyPending = false
                 }
+                mainHandler.postDelayed({
+                    if (this@BleController.gatt === gatt && isGattConnected && readCharacteristicId != null) {
+                        readSelectedCharacteristic()
+                    }
+                }, 350L)
             } else {
                 appendLog("ERR", "服务发现失败，status=$status")
                 retryServiceDiscovery(gatt)
@@ -239,12 +259,14 @@ class BleController(private val context: Context) {
                     val nextChunk = pendingWriteChunks.removeFirst()
                     writeChunk(characteristic, nextChunk)
                 } else {
-                    lastTxValue = writePayload
+                    lastTxValue = pendingWriteDisplayValue ?: writePayload
                     lastWriteError = null
-                    appendLog("TX", "写入 ${shortUuid(characteristic.uuid.toString())} 成功: $writePayload")
+                    appendLog("TX", "写入 ${shortUuid(characteristic.uuid.toString())} 成功: ${pendingWriteDisplayValue ?: writePayload}")
+                    pendingWriteDisplayValue = null
                 }
             } else {
                 pendingWriteChunks.clear()
+                pendingWriteDisplayValue = null
                 lastWriteError = explainGattStatus(status)
                 appendLog("ERR", "写入失败，status=$status，${explainGattStatus(status)}")
             }
@@ -405,6 +427,10 @@ class BleController(private val context: Context) {
             appendLog("ERR", "当前设备不支持 GATT")
             return
         }
+        if (!device.isConnectable) {
+            appendLog("ERR", "当前设备不可连接，无法发起 GATT")
+            return
+        }
         if (!hasRequiredPermissions()) {
             appendLog("ERR", "缺少蓝牙权限，无法连接")
             return
@@ -458,10 +484,6 @@ class BleController(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     fun writeSelectedCharacteristic() {
-        val characteristic = findWriteCharacteristic() ?: run {
-            appendLog("ERR", "未选择可写特征")
-            return
-        }
         val payload = when (sendMode) {
             SendMode.Hex -> parseHex(writePayload)
             SendMode.Utf8 -> writePayload.toByteArray(Charsets.UTF_8)
@@ -469,20 +491,62 @@ class BleController(private val context: Context) {
             appendLog("ERR", "写入数据不是合法 Hex")
             return
         }
-        if (payload.isEmpty()) {
-            appendLog("ERR", "发送内容为空")
+        val displayValue = when (sendMode) {
+            SendMode.Hex -> payload.toHexString()
+            SendMode.Utf8 -> writePayload
+        }
+        writePayloadBytes(payload, displayValue)
+    }
+
+    @SuppressLint("MissingPermission")
+    fun sendQuickPayload() {
+        val header = parseOptionalHex(quickHeader) ?: run {
+            appendLog("ERR", "快捷发送包头不是合法 Hex")
             return
         }
-        val chunkSize = (currentMtu - 3).coerceAtLeast(1)
-        pendingWriteChunks.clear()
-        payload.asList().chunked(chunkSize).map { it.toByteArray() }.forEach { pendingWriteChunks.addLast(it) }
-        val firstChunk = pendingWriteChunks.removeFirst()
-        val status = writeChunk(characteristic, firstChunk)
-        if (status != BluetoothStatusCodes.SUCCESS) {
-            pendingWriteChunks.clear()
-            lastWriteError = explainGattStatus(status ?: -1)
-            appendLog("ERR", "写入未启动，status=$status，${explainGattStatus(status ?: -1)}")
+        val body = when (quickBodyMode) {
+            SendMode.Hex -> parseHex(quickBody)
+            SendMode.Utf8 -> quickBody.toByteArray(Charsets.UTF_8)
+        } ?: run {
+            appendLog("ERR", "快捷发送正文不是合法 Hex")
+            return
         }
+        val footer = parseOptionalHex(quickFooter) ?: run {
+            appendLog("ERR", "快捷发送包尾不是合法 Hex")
+            return
+        }
+        val payload = header + body + footer
+        if (payload.isEmpty()) {
+            appendLog("ERR", "快捷发送内容为空")
+            return
+        }
+        writePayloadBytes(payload, payload.toHexString())
+    }
+
+    fun fillQuickPayloadIntoWriter() {
+        val header = parseOptionalHex(quickHeader) ?: run {
+            appendLog("ERR", "快捷发送包头不是合法 Hex")
+            return
+        }
+        val body = when (quickBodyMode) {
+            SendMode.Hex -> parseHex(quickBody)
+            SendMode.Utf8 -> quickBody.toByteArray(Charsets.UTF_8)
+        } ?: run {
+            appendLog("ERR", "快捷发送正文不是合法 Hex")
+            return
+        }
+        val footer = parseOptionalHex(quickFooter) ?: run {
+            appendLog("ERR", "快捷发送包尾不是合法 Hex")
+            return
+        }
+        val payload = header + body + footer
+        if (payload.isEmpty()) {
+            appendLog("ERR", "快捷发送内容为空")
+            return
+        }
+        sendMode = SendMode.Hex
+        writePayload = payload.toHexString()
+        appendLog("TX", "快捷发送内容已填入主发送框")
     }
 
     @SuppressLint("MissingPermission")
@@ -634,21 +698,52 @@ class BleController(private val context: Context) {
         gattCharacteristics.clear()
         gattCharacteristics.addAll(items)
         selectedCharacteristicId = items.firstOrNull()?.id
-        readCharacteristicId = items.firstOrNull { isNusTxCharacteristic(it) }?.id ?: items.firstOrNull {
+        val readCandidates = items.filter {
             findCharacteristic(it.id)?.let { c -> hasProperty(c, BluetoothGattCharacteristic.PROPERTY_READ) } == true
-        }?.id
-        writeCharacteristicId = items.firstOrNull { isNusRxCharacteristic(it) }?.id ?: items.firstOrNull {
+        }
+        val writeCandidates = items.filter {
             findCharacteristic(it.id)?.let { c ->
                 hasProperty(c, BluetoothGattCharacteristic.PROPERTY_WRITE) ||
                     hasProperty(c, BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)
             } == true
-        }?.id
-        notifyCharacteristicId = items.firstOrNull { isNusTxCharacteristic(it) }?.id ?: items.firstOrNull {
+        }
+        val notifyCandidates = items.filter {
             findCharacteristic(it.id)?.let { c ->
                 hasProperty(c, BluetoothGattCharacteristic.PROPERTY_NOTIFY) ||
                     hasProperty(c, BluetoothGattCharacteristic.PROPERTY_INDICATE)
             } == true
-        }?.id
+        }
+
+        val combinedIoCandidate = items.firstOrNull {
+            findCharacteristic(it.id)?.let { c ->
+                hasProperty(c, BluetoothGattCharacteristic.PROPERTY_READ) &&
+                    (
+                        hasProperty(c, BluetoothGattCharacteristic.PROPERTY_WRITE) ||
+                            hasProperty(c, BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)
+                        ) &&
+                    (
+                        hasProperty(c, BluetoothGattCharacteristic.PROPERTY_NOTIFY) ||
+                            hasProperty(c, BluetoothGattCharacteristic.PROPERTY_INDICATE)
+                        )
+            } == true
+        }
+        val preferredWrite = items.firstOrNull { isNusRxCharacteristic(it) }
+            ?: combinedIoCandidate
+            ?: writeCandidates.firstOrNull()
+        val preferredNotify = items.firstOrNull { isNusTxCharacteristic(it) }
+            ?: notifyCandidates.firstOrNull { it.id == preferredWrite?.id }
+            ?: notifyCandidates.firstOrNull { it.serviceUuid == preferredWrite?.serviceUuid }
+            ?: combinedIoCandidate
+            ?: notifyCandidates.firstOrNull()
+        val preferredRead = items.firstOrNull { isNusTxCharacteristic(it) }
+            ?: readCandidates.firstOrNull { it.id == preferredWrite?.id }
+            ?: readCandidates.firstOrNull { it.serviceUuid == preferredWrite?.serviceUuid }
+            ?: combinedIoCandidate
+            ?: readCandidates.firstOrNull()
+
+        writeCharacteristicId = preferredWrite?.id
+        notifyCharacteristicId = preferredNotify?.id
+        readCharacteristicId = preferredRead?.id
         selectedCharacteristicId = writeCharacteristicId ?: notifyCharacteristicId ?: readCharacteristicId ?: selectedCharacteristicId
     }
 
@@ -666,6 +761,7 @@ class BleController(private val context: Context) {
         lastWriteError = null
         currentMtu = 23
         pendingWriteChunks.clear()
+        pendingWriteDisplayValue = null
         autoEnableNotifyPending = false
         gattCharacteristics.clear()
         gatt = null
@@ -736,6 +832,30 @@ class BleController(private val context: Context) {
         }
         return gatt?.writeCharacteristic(characteristic, chunk, writeType)
     }
+
+    @SuppressLint("MissingPermission")
+    private fun writePayloadBytes(payload: ByteArray, displayValue: String) {
+        val characteristic = findWriteCharacteristic() ?: run {
+            appendLog("ERR", "未选择可写特征")
+            return
+        }
+        if (payload.isEmpty()) {
+            appendLog("ERR", "发送内容为空")
+            return
+        }
+        val chunkSize = (currentMtu - 3).coerceAtLeast(1)
+        pendingWriteChunks.clear()
+        pendingWriteDisplayValue = displayValue
+        payload.asList().chunked(chunkSize).map { it.toByteArray() }.forEach { pendingWriteChunks.addLast(it) }
+        val firstChunk = pendingWriteChunks.removeFirst()
+        val status = writeChunk(characteristic, firstChunk)
+        if (status != BluetoothStatusCodes.SUCCESS) {
+            pendingWriteChunks.clear()
+            pendingWriteDisplayValue = null
+            lastWriteError = explainGattStatus(status ?: -1)
+            appendLog("ERR", "写入未启动，status=$status，${explainGattStatus(status ?: -1)}")
+        }
+    }
 }
 
 data class BleScanItem(
@@ -751,7 +871,7 @@ data class BleScanItem(
     val rssiLabel: String
         get() = if (isBonded && rssi == 0) "-- dBm" else "$rssi dBm"
     val supportsGatt: Boolean
-        get() = transport == "BLE" || transport == "双模"
+        get() = transport == "BLE" && isConnectable
 }
 
 data class LogItem(
@@ -802,6 +922,11 @@ fun parseHex(input: String): ByteArray? {
         return null
     }
     return normalized.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+}
+
+fun parseOptionalHex(input: String): ByteArray? {
+    val normalized = input.replace(" ", "")
+    return if (normalized.isBlank()) byteArrayOf() else parseHex(input)
 }
 
 fun Int.asPropertyLabel(): String {

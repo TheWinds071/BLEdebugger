@@ -48,7 +48,8 @@ fun DeviceScreen(
         Text(
             text = "蓝牙调试助手",
             style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
         )
         DeviceOverviewStrip(
             deviceCount = devices.size,
@@ -131,8 +132,8 @@ fun DeviceScreen(
     pendingDevice?.let { device ->
         AlertDialog(
             onDismissRequest = { pendingDevice = null },
-            title = { Text("连接设备") },
-            text = { Text("是否连接 ${device.displayName}？") },
+            title = { Text("连接设备", color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("是否连接 ${device.displayName}？", color = MaterialTheme.colorScheme.onSurface) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -153,6 +154,7 @@ fun DeviceOverviewStrip(deviceCount: Int, status: String, pairedCount: Int) {
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.16f))
     ) {
         Row(
@@ -185,7 +187,8 @@ fun DeviceRow(device: BleScanItem, selected: Boolean, onClick: () -> Unit) {
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else androidx.compose.ui.graphics.Color.Transparent
+        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else androidx.compose.ui.graphics.Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onSurface
     ) {
         Row(
             modifier = Modifier
