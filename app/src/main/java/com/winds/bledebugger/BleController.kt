@@ -236,7 +236,7 @@ class BleController(private val context: Context) {
         ) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 lastGattValue = formatReceivedValue(value)
-                incomingMessageDialog = lastGattValue
+                incomingMessageDialog = value.toString(Charsets.UTF_8)
                 appendLog("RX", "读取 ${shortUuid(characteristic.uuid.toString())}: ${value.toHexString()}")
             } else {
                 appendLog("ERR", "读取失败，status=$status")
@@ -249,7 +249,7 @@ class BleController(private val context: Context) {
             value: ByteArray
         ) {
             lastGattValue = formatReceivedValue(value)
-            incomingMessageDialog = lastGattValue
+            incomingMessageDialog = value.toString(Charsets.UTF_8)
             appendLog("NTF", "通知 ${shortUuid(characteristic.uuid.toString())}: ${value.toHexString()}")
         }
 
@@ -586,6 +586,11 @@ class BleController(private val context: Context) {
     fun appendLog(type: String, message: String) {
         logs.add(LogItem(timestampNow(), type, message))
         if (logs.size > 100) logs.removeAt(0)
+    }
+
+    fun clearLogs() {
+        logs.clear()
+        appendLog("SYS", "日志已清空")
     }
 
     fun dismissIncomingMessageDialog() {

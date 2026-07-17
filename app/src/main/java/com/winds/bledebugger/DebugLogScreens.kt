@@ -1,13 +1,18 @@
 package com.winds.bledebugger
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -17,11 +22,16 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import kotlinx.coroutines.delay
 
 @Composable
@@ -240,23 +250,291 @@ fun IncomingMessageBanner(message: String, modifier: Modifier = Modifier) {
 @Composable
 fun LogScreen(controller: BleController) {
     val logs = controller.logs
+    val terminalScrollState = rememberScrollState()
+    val promptLabel = if (controller.sendMode == SendMode.Hex) "hex" else "utf8"
+    val selectedDevice = controller.selectedDevice
+
+    LaunchedEffect(logs.size) {
+        terminalScrollState.animateScrollTo(terminalScrollState.maxValue)
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        MetricCard(
-            title = "实时日志",
-            value = logs.size.toString().padStart(2, '0'),
-            description = "扫描状态、权限变化和设备发现记录会实时写入这里。"
-        )
-        SectionCard(title = "会话流", subtitle = "最新日志优先显示") {
-            if (logs.isEmpty()) {
-                Text("暂无日志", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                logs.asReversed().forEach { item ->
-                    LogRow(item.time, item.type, item.message)
+        Surface(
+            shape = RoundedCornerShape(30.dp),
+            color = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "bluetooth-shell",
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = buildString {
+                                append(selectedDevice?.displayName ?: "no-device")
+                                append(" · ")
+                                append(if (controller.isGattConnected) "connected" else "disconnected")
+                                append(" · logs=")
+                                append(logs.size)
+                            },
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TerminalActionButton(
+                            text = "CLEAR",
+                            onClick = { controller.clearLogs() },
+                            enabled = logs.isNotEmpty()
+                        )
+                        TerminalActionButton(
+                            text = if (controller.isGattConnected) "DISCONNECT" else "CONNECT",
+                            onClick = {
+                                if (controller.isGattConnected) controller.disconnectGatt()
+                                else controller.connectSelectedDevice(autoEnableNotify = true)
+                            },
+                            enabled = selectedDevice?.supportsGatt == true
+                        )
+                    }
+                }
+
+                TerminalStatusBar(controller = controller)
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 320.dp, max = 480.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.background,
+                            shape = RoundedCornerShape(22.dp)
+                        )
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                ) {
+                    if (logs.isEmpty()) {
+                        Text(
+                            text = "waiting for bluetooth events...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .fillMaxHeight()
+                                .verticalScroll(terminalScrollState),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            logs.forEach { item ->
+                                TerminalLogRow(item = item)
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "mode",
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.weight(1f)) {
+                            SegmentedButton(
+                                selected = controller.sendMode == SendMode.Hex,
+                                onClick = { controller.sendMode = SendMode.Hex },
+                                shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                                colors = appSegmentedButtonColors()
+                            ) { Text("Hex") }
+                            SegmentedButton(
+                                selected = controller.sendMode == SendMode.Utf8,
+                                onClick = { controller.sendMode = SendMode.Utf8 },
+                                shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                                colors = appSegmentedButtonColors()
+                            ) { Text("UTF-8") }
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        tonalElevation = 0.dp
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "$promptLabel>",
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            OutlinedTextField(
+                                value = controller.writePayload,
+                                onValueChange = {
+                                    controller.writePayload = if (controller.sendMode == SendMode.Hex) {
+                                        it.uppercase()
+                                    } else {
+                                        it
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                placeholder = {
+                                    Text(
+                                        if (controller.sendMode == SendMode.Hex) "AA 55 01 03" else "input bluetooth message"
+                                    )
+                                },
+                                singleLine = true,
+                                shape = RoundedCornerShape(16.dp),
+                                colors = appOutlinedFieldColors()
+                            )
+                            Button(
+                                onClick = { controller.writeSelectedCharacteristic() },
+                                enabled = controller.canWriteSelectedCharacteristic,
+                                shape = RoundedCornerShape(16.dp),
+                                colors = appFilledButtonColors()
+                            ) {
+                                Text("发送")
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = if (controller.canWriteSelectedCharacteristic) {
+                            "目标特征 ${controller.writeCharacteristicSummary ?: "--"}，可直接手动发送蓝牙消息。"
+                        } else {
+                            "当前没有可写特征。先在设备页选中 BLE 设备并建立 GATT 连接。"
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun TerminalStatusBar(controller: BleController) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TerminalInlineChip("state", controller.gattConnectionState)
+                TerminalInlineChip("mtu", controller.currentMtu.toString())
+                TerminalInlineChip("notify", if (controller.notifyEnabled) "on" else "off")
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TerminalInlineChip("tx", controller.writeCharacteristicSummary ?: "--")
+                TerminalInlineChip("rx", controller.notifyCharacteristicSummary ?: "--")
+            }
+        }
+    }
+}
+
+@Composable
+private fun TerminalInlineChip(label: String, value: String) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.primaryContainer
+    ) {
+        Text(
+            text = "$label=$value",
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 12.sp
+        )
+    }
+}
+
+@Composable
+private fun TerminalActionButton(text: String, onClick: () -> Unit, enabled: Boolean) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(14.dp),
+        colors = appOutlinedButtonColors(),
+        border = appOutlinedButtonBorder(enabled)
+    ) {
+        Text(text, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun TerminalLogRow(item: LogItem) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = item.time,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 12.sp
+        )
+        Text(
+            text = "[${item.type}]",
+            color = terminalTagColor(item.type),
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp
+        )
+        Text(
+            text = item.message,
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onSurface,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 13.sp,
+            lineHeight = 19.sp
+        )
+    }
+}
+
+@Composable
+private fun terminalTagColor(type: String): Color = when (type) {
+    "ERR" -> MaterialTheme.colorScheme.error
+    "TX" -> MaterialTheme.colorScheme.primary
+    "RX", "NTF" -> MaterialTheme.colorScheme.tertiary
+    "GATT" -> MaterialTheme.colorScheme.secondary
+    "ADV" -> MaterialTheme.colorScheme.primary
+    "SEL" -> MaterialTheme.colorScheme.secondary
+    else -> MaterialTheme.colorScheme.outline
 }
 
 @Composable
