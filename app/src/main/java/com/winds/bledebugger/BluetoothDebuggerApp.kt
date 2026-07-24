@@ -2,6 +2,7 @@ package com.winds.bledebugger
 
 import android.bluetooth.BluetoothAdapter
 import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -39,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Devices
@@ -49,6 +51,9 @@ import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.extra.SuperDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -57,6 +62,8 @@ fun BluetoothDebuggerApp() {
     val controller = remember(context.applicationContext) { BleController(context.applicationContext) }
     var currentTab by rememberSaveable { androidx.compose.runtime.mutableIntStateOf(0) }
     var bannerMessage by remember { mutableStateOf<String?>(null) }
+    var availableUpdate by remember { mutableStateOf<ReleaseUpdate?>(null) }
+    val isPreview = LocalInspectionMode.current
 
     DisposableEffect(controller) {
         controller.startObserving()
@@ -79,6 +86,12 @@ fun BluetoothDebuggerApp() {
         delay(2800)
         if (controller.incomingMessageDialog == message) controller.dismissIncomingMessageDialog()
         bannerMessage = null
+    }
+
+    LaunchedEffect(Unit) {
+        if (!isPreview) {
+            availableUpdate = UpdateChecker.findAvailableUpdate(context.applicationContext)
+        }
     }
 
     Scaffold(
@@ -134,6 +147,39 @@ fun BluetoothDebuggerApp() {
                 exit = slideOutVertically { -it } + fadeOut()
             ) {
                 bannerMessage?.let { IncomingMessageBanner(it) }
+            }
+
+            val update = availableUpdate
+            SuperDialog(
+                title = update?.let { "发现新版本 ${it.tagName}" },
+                summary = update?.releaseNotes?.ifBlank { "新版本已经发布，是否前往下载？" },
+                show = update != null,
+                onDismissRequest = { availableUpdate = null }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    TextButton(
+                        text = "稍后",
+                        onClick = { availableUpdate = null },
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(
+                        text = "前往下载",
+                        onClick = {
+                            val releaseUrl = update?.releaseUrl ?: return@TextButton
+                            availableUpdate = null
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl))
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.textButtonColorsPrimary()
+                    )
+                }
             }
         }
     }
