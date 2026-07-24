@@ -72,6 +72,7 @@ fun IconActionButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    iconModifier: Modifier = Modifier,
     enabled: Boolean = true,
     selected: Boolean = false
 ) {
@@ -79,7 +80,9 @@ fun IconActionButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
-        holdDownState = selected,
+        cornerRadius = 16.dp,
+        minWidth = 44.dp,
+        minHeight = 44.dp,
         backgroundColor = if (selected) {
             MiuixTheme.colorScheme.primaryContainer
         } else {
@@ -89,6 +92,7 @@ fun IconActionButton(
         Image(
             painter = painterResource(iconRes),
             contentDescription = contentDescription,
+            modifier = iconModifier,
             colorFilter = ColorFilter.tint(
                 when {
                     !enabled -> MiuixTheme.colorScheme.onSurfaceVariantSummary

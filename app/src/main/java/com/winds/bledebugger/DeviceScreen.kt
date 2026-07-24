@@ -1,5 +1,10 @@
 package com.winds.bledebugger
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,6 +47,15 @@ fun DeviceScreen(
     var pendingDevice by remember { mutableStateOf<BleScanItem?>(null) }
     var showUnnamedDevices by rememberSaveable { mutableStateOf(false) }
     val visibleDevices = if (showUnnamedDevices) devices else devices.filter { !it.name.isNullOrBlank() }
+    val refreshTransition = rememberInfiniteTransition(label = "refresh_rotation")
+    val refreshRotation by refreshTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = if (controller.isScanning) 360f else 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = LinearEasing)
+        ),
+        label = "refresh_icon_rotation"
+    )
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -61,14 +76,15 @@ fun DeviceScreen(
                 )
                 IconActionButton(
                     iconRes = R.drawable.ic_refresh,
-                    contentDescription = "刷新设备",
+                    contentDescription = if (controller.isScanning) "停止刷新设备" else "刷新设备",
                     selected = controller.isScanning,
+                    iconModifier = Modifier.graphicsLayer { rotationZ = refreshRotation },
                     onClick = {
                         when {
                             !controller.hasRequiredPermissions() -> onRequestPermissions()
                             !controller.isBluetoothEnabled -> onRequestEnableBluetooth()
+                            controller.isScanning -> controller.stopScan()
                             else -> {
-                                if (controller.isScanning) controller.stopScan()
                                 controller.clearResults()
                                 controller.startScan()
                             }
