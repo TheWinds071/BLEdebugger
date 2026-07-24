@@ -63,6 +63,7 @@ fun BluetoothDebuggerApp() {
     var currentTab by rememberSaveable { androidx.compose.runtime.mutableIntStateOf(0) }
     var bannerMessage by remember { mutableStateOf<String?>(null) }
     var availableUpdate by remember { mutableStateOf<ReleaseUpdate?>(null) }
+    var permissionRequestStarted by rememberSaveable { mutableStateOf(false) }
     val isPreview = LocalInspectionMode.current
 
     DisposableEffect(controller) {
@@ -79,6 +80,13 @@ fun BluetoothDebuggerApp() {
     val enableBluetoothLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { controller.refreshState() }
+
+    LaunchedEffect(isPreview, controller) {
+        if (!isPreview && !permissionRequestStarted && !controller.hasRequiredPermissions()) {
+            permissionRequestStarted = true
+            permissionLauncher.launch(BLE_PERMISSIONS)
+        }
+    }
 
     LaunchedEffect(controller.incomingMessageDialog) {
         val message = controller.incomingMessageDialog ?: return@LaunchedEffect

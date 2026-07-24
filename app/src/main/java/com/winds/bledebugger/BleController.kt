@@ -19,10 +19,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.location.LocationManager
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -51,15 +49,13 @@ class BleController(private val context: Context) {
 
     var isBluetoothSupported by mutableStateOf(adapter != null)
         private set
-    var isBluetoothEnabled by mutableStateOf(adapter?.isEnabled == true)
+    var isBluetoothEnabled by mutableStateOf(false)
         private set
     var isScanning by mutableStateOf(false)
         private set
-    var isScannerAvailable by mutableStateOf(scanner != null)
+    var isScannerAvailable by mutableStateOf(false)
         private set
-    var isClassicDiscovering by mutableStateOf(adapter?.isDiscovering == true)
-        private set
-    var isLocationEnabled by mutableStateOf(isLocationServiceEnabled())
+    var isClassicDiscovering by mutableStateOf(false)
         private set
     var bondedDeviceCount by mutableStateOf(0)
         private set
@@ -346,12 +342,27 @@ class BleController(private val context: Context) {
     }
 
     fun refreshState() {
-        isBluetoothSupported = adapter != null
-        isBluetoothEnabled = adapter?.isEnabled == true
-        isScannerAvailable = scanner != null
-        isClassicDiscovering = adapter?.isDiscovering == true
-        isLocationEnabled = isLocationServiceEnabled()
-        loadBondedDevices()
+        val currentAdapter = adapter
+        isBluetoothSupported = currentAdapter != null
+        if (!hasRequiredPermissions()) {
+            isBluetoothEnabled = false
+            isScannerAvailable = false
+            isClassicDiscovering = false
+            bondedDeviceCount = 0
+            return
+        }
+        try {
+            isBluetoothEnabled = currentAdapter?.isEnabled == true
+            isScannerAvailable = currentAdapter?.bluetoothLeScanner != null
+            isClassicDiscovering = currentAdapter?.isDiscovering == true
+            loadBondedDevices()
+        } catch (_: SecurityException) {
+            isBluetoothEnabled = false
+            isScannerAvailable = false
+            isClassicDiscovering = false
+            bondedDeviceCount = 0
+            appendLog("ERR", "蓝牙权限已失效，请重新授权")
+        }
     }
 
     fun hasRequiredPermissions(): Boolean {
@@ -374,9 +385,6 @@ class BleController(private val context: Context) {
         if (!isBluetoothEnabled) {
             appendLog("ERR", "蓝牙未开启")
             return
-        }
-        if (!isLocationEnabled) {
-            appendLog("ERR", "定位服务未开启，很多设备上将无法扫描到附近蓝牙设备")
         }
         if (isScanning) return
 
@@ -403,14 +411,18 @@ class BleController(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     fun stopScan() {
-        if (isScanning) {
+        if (!isScanning) return
+        try {
             scanner?.stopScan(callback)
             if (adapter?.isDiscovering == true) {
                 adapter?.cancelDiscovery()
             }
+            appendLog("SYS", "停止扫描")
+        } catch (_: SecurityException) {
+            appendLog("ERR", "蓝牙权限已失效，扫描已停止")
+        } finally {
             isClassicDiscovering = false
             isScanning = false
-            appendLog("SYS", "停止扫描")
         }
     }
 
@@ -477,9 +489,14 @@ class BleController(private val context: Context) {
     @SuppressLint("MissingPermission")
     fun disconnectGatt() {
         autoEnableNotifyPending = false
-        gatt?.disconnect()
-        gatt?.close()
-        clearGattState()
+        try {
+            gatt?.disconnect()
+            gatt?.close()
+        } catch (_: SecurityException) {
+            appendLog("ERR", "蓝牙权限已失效，连接已清理")
+        } finally {
+            clearGattState()
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -695,19 +712,6 @@ class BleController(private val context: Context) {
         if (selectedDevice?.isBonded != true) {
             selectedDevice = null
         }
-    }
-
-    fun openLocationSettings() {
-        context.startActivity(
-            Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        )
-    }
-
-    private fun isLocationServiceEnabled(): Boolean {
-        val locationManager = context.getSystemService(LocationManager::class.java)
-        return locationManager?.isLocationEnabled == true
     }
 
     private fun updateGattCharacteristics(gatt: BluetoothGatt) {
@@ -926,8 +930,7 @@ enum class SendMode {
 
 val BLE_PERMISSIONS = arrayOf(
     Manifest.permission.BLUETOOTH_SCAN,
-    Manifest.permission.BLUETOOTH_CONNECT,
-    Manifest.permission.ACCESS_FINE_LOCATION
+    Manifest.permission.BLUETOOTH_CONNECT
 )
 
 val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
