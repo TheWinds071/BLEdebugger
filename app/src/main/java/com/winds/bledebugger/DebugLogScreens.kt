@@ -5,12 +5,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -21,9 +22,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -41,34 +42,6 @@ fun DebugScreen(controller: BleController) {
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(
-            text = "发送数据",
-            style = MiuixTheme.textStyles.title1,
-            fontWeight = FontWeight.Bold
-        )
-
-        SectionCard(
-            title = controller.selectedDevice?.displayName ?: "未选择设备",
-            subtitle = if (controller.isGattConnected) "已连接 · 可以发送" else "${controller.gattConnectionState} · 请先在设备页选择设备"
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Button(
-                    onClick = { controller.connectSelectedDevice(autoEnableNotify = true) },
-                    modifier = Modifier.weight(1f),
-                    enabled = controller.selectedDevice?.supportsGatt == true && !controller.isGattConnected,
-                    colors = ButtonDefaults.buttonColorsPrimary()
-                ) { Text("连接") }
-                Button(
-                    onClick = { controller.disconnectGatt() },
-                    modifier = Modifier.weight(1f),
-                    enabled = controller.isGattConnected
-                ) { Text("断开") }
-            }
-        }
-
         SectionCard(title = "数据格式", subtitle = "包头和包尾固定使用 HEX，正文可选 HEX 或 UTF-8") {
             FormatSelector(
                 mode = controller.quickBodyMode,
@@ -171,44 +144,48 @@ fun IncomingMessageBanner(message: String, modifier: Modifier = Modifier) {
 @Composable
 fun LogScreen(controller: BleController) {
     val logs = controller.logs
-    val logScrollState = rememberScrollState()
+    val listState = rememberLazyListState()
 
     LaunchedEffect(logs.size) {
-        logScrollState.animateScrollTo(logScrollState.maxValue)
+        if (logs.isNotEmpty()) {
+            listState.animateScrollToItem(logs.lastIndex)
+        }
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("日志", style = MiuixTheme.textStyles.title1, fontWeight = FontWeight.Bold)
-                Text(
-                    "共 ${logs.size} 条",
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
-            }
-            TextButton(
-                text = "清空",
+            Text(
+                "共 ${logs.size} 条",
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+            )
+            IconActionButton(
+                iconRes = R.drawable.ic_delete,
+                contentDescription = "清空日志",
                 onClick = { controller.clearLogs() },
-                enabled = logs.isNotEmpty(),
-                colors = ButtonDefaults.textButtonColorsPrimary()
+                enabled = logs.isNotEmpty()
             )
         }
 
-        SectionCard(title = "蓝牙日志") {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            shape = RoundedCornerShape(18.dp),
+            color = MiuixTheme.colorScheme.secondaryContainer
+        ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 360.dp, max = 560.dp)
-                    .background(
-                        MiuixTheme.colorScheme.secondaryContainer,
-                        RoundedCornerShape(16.dp)
-                    )
-                    .padding(14.dp)
+                    .fillMaxSize()
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center
             ) {
                 if (logs.isEmpty()) {
                     Text(
@@ -216,11 +193,13 @@ fun LogScreen(controller: BleController) {
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
                 } else {
-                    Column(
-                        modifier = Modifier.verticalScroll(logScrollState),
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        state = listState,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 14.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        logs.forEach { item ->
+                        items(logs) { item ->
                             Text(
                                 text = "${item.time}  [${item.type}]  ${item.message}",
                                 fontFamily = FontFamily.Monospace,

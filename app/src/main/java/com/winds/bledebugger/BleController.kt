@@ -36,6 +36,7 @@ import java.util.UUID
 
 class BleController(private val context: Context) {
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val settings = context.getSharedPreferences("ble_debugger_settings", Context.MODE_PRIVATE)
     private val bluetoothManager = context.getSystemService(BluetoothManager::class.java)
     private val adapter: BluetoothAdapter? get() = bluetoothManager?.adapter
     private val scanner: BluetoothLeScanner? get() = adapter?.bluetoothLeScanner
@@ -92,9 +93,21 @@ class BleController(private val context: Context) {
         private set
     var writePayload by mutableStateOf("")
     var sendMode by mutableStateOf(SendMode.Hex)
-    var quickHeader by mutableStateOf("")
+    private var quickHeaderState by mutableStateOf(settings.getString("packet_header", "").orEmpty())
+    var quickHeader: String
+        get() = quickHeaderState
+        set(value) {
+            quickHeaderState = value
+            settings.edit().putString("packet_header", value).apply()
+        }
     var quickBody by mutableStateOf("")
-    var quickFooter by mutableStateOf("")
+    private var quickFooterState by mutableStateOf(settings.getString("packet_footer", "").orEmpty())
+    var quickFooter: String
+        get() = quickFooterState
+        set(value) {
+            quickFooterState = value
+            settings.edit().putString("packet_footer", value).apply()
+        }
     var quickBodyMode by mutableStateOf(SendMode.Hex)
     var currentMtu by mutableStateOf(23)
         private set

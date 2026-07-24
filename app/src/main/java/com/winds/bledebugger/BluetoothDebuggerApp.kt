@@ -18,11 +18,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,7 +35,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
@@ -59,8 +56,6 @@ fun BluetoothDebuggerApp() {
     val context = LocalContext.current
     val controller = remember(context.applicationContext) { BleController(context.applicationContext) }
     var currentTab by rememberSaveable { androidx.compose.runtime.mutableIntStateOf(0) }
-    var showBottomBar by rememberSaveable { mutableStateOf(true) }
-    val scrollStates = listOf(rememberScrollState(), rememberScrollState(), rememberScrollState())
     var bannerMessage by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(controller) {
@@ -78,15 +73,6 @@ fun BluetoothDebuggerApp() {
         contract = ActivityResultContracts.StartActivityForResult()
     ) { controller.refreshState() }
 
-    LaunchedEffect(currentTab) {
-        val state = scrollStates[currentTab]
-        var previous = state.value
-        snapshotFlow { state.value }.collect { current ->
-            showBottomBar = current <= previous || current < 8
-            previous = current
-        }
-    }
-
     LaunchedEffect(controller.incomingMessageDialog) {
         val message = controller.incomingMessageDialog ?: return@LaunchedEffect
         bannerMessage = message
@@ -98,7 +84,10 @@ fun BluetoothDebuggerApp() {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = MiuixTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        bottomBar = {
+            MiuixBottomBar(currentTab = currentTab, onTabSelected = { currentTab = it })
+        }
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize()) {
             Crossfade(
@@ -107,15 +96,13 @@ fun BluetoothDebuggerApp() {
                 label = "page_switch",
                 modifier = Modifier.fillMaxSize()
             ) { tab ->
-                Column(
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
                         .statusBarsPadding()
                         .padding(horizontal = 18.dp)
-                        .padding(top = 18.dp)
-                        .verticalScroll(scrollStates[tab]),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                        .padding(top = 12.dp, bottom = 8.dp)
                 ) {
                     when (tab) {
                         0 -> DeviceScreen(
@@ -125,10 +112,15 @@ fun BluetoothDebuggerApp() {
                                 enableBluetoothLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
                             }
                         )
-                        1 -> DebugScreen(controller)
+                        1 -> Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            DebugScreen(controller)
+                        }
                         else -> LogScreen(controller)
                     }
-                    Spacer(Modifier.height(104.dp))
                 }
             }
 
@@ -142,15 +134,6 @@ fun BluetoothDebuggerApp() {
                 exit = slideOutVertically { -it } + fadeOut()
             ) {
                 bannerMessage?.let { IncomingMessageBanner(it) }
-            }
-
-            AnimatedVisibility(
-                visible = showBottomBar,
-                modifier = Modifier.align(Alignment.BottomCenter),
-                enter = slideInVertically { it / 2 } + fadeIn(),
-                exit = slideOutVertically { it } + fadeOut()
-            ) {
-                MiuixBottomBar(currentTab = currentTab, onTabSelected = { currentTab = it })
             }
         }
     }

@@ -1,5 +1,7 @@
 package com.winds.bledebugger
 
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -8,9 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -58,5 +63,39 @@ fun StatusLine(label: String, value: String) {
             style = MiuixTheme.textStyles.body2
         )
         Text(text = value, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+fun IconActionButton(
+    @DrawableRes iconRes: Int,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    selected: Boolean = false
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        holdDownState = selected,
+        backgroundColor = if (selected) {
+            MiuixTheme.colorScheme.primaryContainer
+        } else {
+            MiuixTheme.colorScheme.secondaryContainer
+        }
+    ) {
+        Image(
+            painter = painterResource(iconRes),
+            contentDescription = contentDescription,
+            colorFilter = ColorFilter.tint(
+                when {
+                    !enabled -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    selected -> MiuixTheme.colorScheme.primary
+                    else -> MiuixTheme.colorScheme.onSurface
+                }
+            )
+        )
     }
 }
