@@ -84,7 +84,7 @@ fun IconActionButton(
         minWidth = 44.dp,
         minHeight = 44.dp,
         backgroundColor = if (selected) {
-            MiuixTheme.colorScheme.primaryContainer
+            MiuixTheme.colorScheme.primary
         } else {
             MiuixTheme.colorScheme.secondaryContainer
         }
@@ -96,7 +96,7 @@ fun IconActionButton(
             colorFilter = ColorFilter.tint(
                 when {
                     !enabled -> MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    selected -> MiuixTheme.colorScheme.primary
+                    selected -> MiuixTheme.colorScheme.onPrimary
                     else -> MiuixTheme.colorScheme.onSurface
                 }
             )
