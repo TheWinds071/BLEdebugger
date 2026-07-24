@@ -6,17 +6,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,11 +29,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -49,199 +40,133 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.winds.bledebugger.ui.theme.BLEdebuggerTheme
 import kotlinx.coroutines.delay
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.Surface
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun BluetoothDebuggerApp() {
     val context = LocalContext.current
-    val bleController = remember(context.applicationContext) {
-        BleController(context.applicationContext)
-    }
+    val controller = remember(context.applicationContext) { BleController(context.applicationContext) }
     var currentTab by rememberSaveable { androidx.compose.runtime.mutableIntStateOf(0) }
     var showBottomBar by rememberSaveable { mutableStateOf(true) }
-    val deviceScrollState = rememberScrollState()
-    val debugScrollState = rememberScrollState()
-    val logScrollState = rememberScrollState()
-    val bannerAnimationDuration = 220
+    val scrollStates = listOf(rememberScrollState(), rememberScrollState(), rememberScrollState())
     var bannerMessage by remember { mutableStateOf<String?>(null) }
-    var bannerVisible by remember { mutableStateOf(false) }
 
-    DisposableEffect(bleController) {
-        bleController.startObserving()
-        onDispose { bleController.dispose() }
+    DisposableEffect(controller) {
+        controller.startObserving()
+        onDispose { controller.dispose() }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) {
-        bleController.refreshState()
-        bleController.appendLog(
-            type = "SYS",
-            message = if (bleController.hasRequiredPermissions()) "蓝牙权限已授权" else "蓝牙权限未完整授权"
-        )
+        controller.refreshState()
+        controller.appendLog("SYS", if (controller.hasRequiredPermissions()) "蓝牙权限已授权" else "蓝牙权限未完整授权")
     }
     val enableBluetoothLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
-    ) {
-        bleController.refreshState()
-    }
+    ) { controller.refreshState() }
 
     LaunchedEffect(currentTab) {
-        val activeScrollState = when (currentTab) {
-            0 -> deviceScrollState
-            1 -> debugScrollState
-            else -> logScrollState
-        }
-        var previous = activeScrollState.value
-        snapshotFlow { activeScrollState.value }.collect { current ->
+        val state = scrollStates[currentTab]
+        var previous = state.value
+        snapshotFlow { state.value }.collect { current ->
             showBottomBar = current <= previous || current < 8
             previous = current
         }
     }
 
-    LaunchedEffect(currentTab, bleController.incomingMessageDialog) {
-        val incomingMessage = bleController.incomingMessageDialog
-        if (currentTab == 1 && incomingMessage != null) {
-            bannerMessage = incomingMessage
-            bannerVisible = true
-        } else {
-            bannerVisible = false
-        }
+    LaunchedEffect(controller.incomingMessageDialog) {
+        val message = controller.incomingMessageDialog ?: return@LaunchedEffect
+        bannerMessage = message
+        delay(2800)
+        if (controller.incomingMessageDialog == message) controller.dismissIncomingMessageDialog()
+        bannerMessage = null
     }
 
-    LaunchedEffect(bannerVisible, bannerMessage) {
-        if (!bannerVisible && bannerMessage != null) {
-            delay(bannerAnimationDuration.toLong())
-            if (!bannerVisible) {
-                bannerMessage = null
-            }
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
-                    )
-                )
-            )
-    ) {
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Transparent,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0)
-        ) { innerPadding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .padding(top = 10.dp)
-                    .padding(innerPadding)
-                    .padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Crossfade(
-                    targetState = currentTab,
-                    label = "page_switch",
-                    animationSpec = tween(durationMillis = 220),
-                    modifier = Modifier.weight(1f)
-                ) { targetTab ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(
-                                when (targetTab) {
-                                    0 -> deviceScrollState
-                                    1 -> debugScrollState
-                                    else -> logScrollState
-                                }
-                            ),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        when (targetTab) {
-                            0 -> DeviceScreen(
-                                controller = bleController,
-                                onRequestPermissions = { permissionLauncher.launch(BLE_PERMISSIONS) },
-                                onRequestEnableBluetooth = {
-                                    enableBluetoothLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
-                                }
-                            )
-                            1 -> DebugScreen(controller = bleController)
-                            else -> LogScreen(controller = bleController)
-                        }
-                        Spacer(modifier = Modifier.height(112.dp))
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MiuixTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+    ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            Crossfade(
+                targetState = currentTab,
+                animationSpec = tween(220),
+                label = "page_switch",
+                modifier = Modifier.fillMaxSize()
+            ) { tab ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .statusBarsPadding()
+                        .padding(horizontal = 18.dp)
+                        .padding(top = 18.dp)
+                        .verticalScroll(scrollStates[tab]),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    when (tab) {
+                        0 -> DeviceScreen(
+                            controller = controller,
+                            onRequestPermissions = { permissionLauncher.launch(BLE_PERMISSIONS) },
+                            onRequestEnableBluetooth = {
+                                enableBluetoothLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+                            }
+                        )
+                        1 -> DebugScreen(controller)
+                        else -> LogScreen(controller)
                     }
+                    Spacer(Modifier.height(104.dp))
                 }
             }
-        }
 
-        AnimatedVisibility(
-            visible = bannerVisible,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-            enter = topBannerEnter(durationMillis = bannerAnimationDuration),
-            exit = topBannerExit(durationMillis = bannerAnimationDuration)
-        ) {
-            bannerMessage?.let { message ->
-                IncomingMessageBanner(message = message)
+            AnimatedVisibility(
+                visible = bannerMessage != null,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                enter = slideInVertically { -it } + fadeIn(),
+                exit = slideOutVertically { -it } + fadeOut()
+            ) {
+                bannerMessage?.let { IncomingMessageBanner(it) }
             }
-        }
 
-        AnimatedVisibility(
-            visible = showBottomBar,
-            modifier = Modifier.align(Alignment.BottomCenter),
-            enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-        ) {
-            StandardBottomBar(
-                currentTab = currentTab,
-                onTabSelected = { currentTab = it }
-            )
+            AnimatedVisibility(
+                visible = showBottomBar,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                enter = slideInVertically { it / 2 } + fadeIn(),
+                exit = slideOutVertically { it } + fadeOut()
+            ) {
+                MiuixBottomBar(currentTab = currentTab, onTabSelected = { currentTab = it })
+            }
         }
     }
 }
 
-private fun topBannerEnter(durationMillis: Int): EnterTransition =
-    slideInHorizontally(
-        animationSpec = tween(durationMillis = durationMillis),
-        initialOffsetX = { it }
-    ) + fadeIn(animationSpec = tween(durationMillis = durationMillis))
-
-private fun topBannerExit(durationMillis: Int): ExitTransition =
-    slideOutHorizontally(
-        animationSpec = tween(durationMillis = durationMillis),
-        targetOffsetX = { -it }
-    ) + fadeOut(animationSpec = tween(durationMillis = durationMillis))
-
 @Composable
-fun StandardBottomBar(
-    currentTab: Int,
-    onTabSelected: (Int) -> Unit
-) {
+private fun MiuixBottomBar(currentTab: Int, onTabSelected: (Int) -> Unit) {
     val tabs = listOf(
         BottomTab("设备", R.drawable.ic_device_tab),
-        BottomTab("调试", R.drawable.ic_debug_tab),
+        BottomTab("发送", R.drawable.ic_debug_tab),
         BottomTab("日志", R.drawable.ic_log_tab)
     )
-
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface
+        color = MiuixTheme.colorScheme.surface,
+        shadowElevation = 10.dp
     ) {
         Row(
             modifier = Modifier
@@ -251,29 +176,30 @@ fun StandardBottomBar(
         ) {
             tabs.forEachIndexed { index, tab ->
                 val selected = currentTab == index
-                val interactionSource = remember { MutableInteractionSource() }
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .clickable(
-                            interactionSource = interactionSource,
+                            interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                             onClick = { onTabSelected(index) }
                         )
-                        .padding(vertical = 10.dp),
+                        .padding(vertical = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(
+                    val tint = if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    Image(
                         painter = painterResource(tab.iconRes),
                         contentDescription = tab.label,
-                        tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+                        colorFilter = ColorFilter.tint(tint),
+                        modifier = Modifier.size(22.dp)
                     )
                     Text(
                         text = tab.label,
-                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelMedium
+                        color = tint,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        style = MiuixTheme.textStyles.footnote1
                     )
                 }
             }
@@ -284,21 +210,11 @@ fun StandardBottomBar(
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun BluetoothDebuggerPreview() {
-    BLEdebuggerTheme {
-        BluetoothDebuggerApp()
-    }
+    BLEdebuggerTheme { BluetoothDebuggerApp() }
 }
 
-@Preview(
-    name = "Dark",
-    showBackground = true,
-    showSystemUi = true,
-    device = Devices.PIXEL_6,
-    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES
-)
+@Preview(name = "Dark", showBackground = true, showSystemUi = true, device = Devices.PIXEL_6)
 @Composable
 fun BluetoothDebuggerDarkPreview() {
-    BLEdebuggerTheme(darkTheme = true, dynamicColor = false) {
-        BluetoothDebuggerApp()
-    }
+    BLEdebuggerTheme(darkTheme = true, dynamicColor = false) { BluetoothDebuggerApp() }
 }

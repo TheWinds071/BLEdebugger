@@ -1,7 +1,5 @@
 package com.winds.bledebugger
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,12 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +18,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Surface
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.extra.SuperDialog
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun DeviceScreen(
@@ -36,90 +35,71 @@ fun DeviceScreen(
     val devices = controller.scanResults
     var pendingDevice by remember { mutableStateOf<BleScanItem?>(null) }
     val status = when {
-        !controller.isBluetoothSupported -> "设备不支持蓝牙"
-        !controller.hasRequiredPermissions() -> "等待权限"
-        !controller.isBluetoothEnabled -> "蓝牙已关闭"
-        controller.isScanning -> "扫描中"
-        else -> "已就绪"
+        !controller.isBluetoothSupported -> "不支持蓝牙"
+        !controller.hasRequiredPermissions() -> "需要蓝牙权限"
+        !controller.isBluetoothEnabled -> "蓝牙未开启"
+        controller.isScanning -> "正在扫描"
+        else -> "可以开始扫描"
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(
             text = "蓝牙调试助手",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
+            style = MiuixTheme.textStyles.title1,
+            fontWeight = FontWeight.Bold
         )
-        DeviceOverviewStrip(
-            deviceCount = devices.size,
-            status = status,
-            pairedCount = devices.count { it.isBonded }
-        )
-        SectionCard(title = "扫描控制", subtitle = "混合扫描 BLE 与经典蓝牙，支持权限与蓝牙状态检测") {
+
+        SectionCard(title = status, subtitle = "发现 ${devices.size} 台设备 · 已选 ${controller.selectedDevice?.displayName ?: "无"}") {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                if (!controller.hasRequiredPermissions()) {
-                    Button(
-                        onClick = onRequestPermissions,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = appFilledButtonColors()
-                    ) { Text("授权蓝牙") }
-                } else if (!controller.isBluetoothEnabled) {
-                    Button(
-                        onClick = onRequestEnableBluetooth,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = appFilledButtonColors()
-                    ) { Text("打开蓝牙") }
-                } else {
-                    Button(
-                        onClick = {
-                            if (controller.isScanning) controller.stopScan() else controller.startScan()
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = appFilledButtonColors()
-                    ) {
-                        Text(if (controller.isScanning) "停止扫描" else "开始扫描")
-                    }
+                Button(
+                    onClick = {
+                        when {
+                            !controller.hasRequiredPermissions() -> onRequestPermissions()
+                            !controller.isBluetoothEnabled -> onRequestEnableBluetooth()
+                            controller.isScanning -> controller.stopScan()
+                            else -> controller.startScan()
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColorsPrimary()
+                ) {
+                    Text(
+                        when {
+                            !controller.hasRequiredPermissions() -> "授权"
+                            !controller.isBluetoothEnabled -> "打开蓝牙"
+                            controller.isScanning -> "停止"
+                            else -> "扫描设备"
+                        }
+                    )
                 }
-                OutlinedButton(
+                Button(
                     onClick = { controller.clearResults() },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = appOutlinedButtonColors(),
-                    border = appOutlinedButtonBorder(enabled = true)
-                ) { Text("清空列表") }
+                    enabled = devices.isNotEmpty()
+                ) { Text("清空") }
             }
             if (!controller.isLocationEnabled) {
-                OutlinedButton(
+                TextButton(
+                    text = "定位服务未开启，点击前往设置",
                     onClick = { controller.openLocationSettings() },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = appOutlinedButtonColors(),
-                    border = appOutlinedButtonBorder(enabled = true)
-                ) { Text("打开定位服务") }
+                    colors = ButtonDefaults.textButtonColorsPrimary()
+                )
             }
-            StatusLine("权限", if (controller.hasRequiredPermissions()) "已授权" else "未授权")
-            StatusLine("蓝牙", if (controller.isBluetoothEnabled) "已开启" else "未开启")
-            StatusLine("定位", if (controller.isLocationEnabled) "已开启" else "未开启")
-            StatusLine("扫描器", if (controller.isScannerAvailable) "可用" else "不可用")
-            StatusLine("经典搜索", if (controller.isClassicDiscovering) "进行中" else "未进行")
-            StatusLine("BLE 扫描", if (controller.isScanning) "进行中" else "未进行")
-            StatusLine("配对设备", controller.bondedDeviceCount.toString())
-            StatusLine("新增设备", controller.discoveryDeviceCount.toString())
-            StatusLine("最后发现", controller.lastDiscoveryTime ?: "--")
-            StatusLine("选中设备", controller.selectedDevice?.displayName ?: "未选择")
         }
+
         SectionCard(
-            title = "设备列表",
-            subtitle = if (devices.isEmpty()) "已配对设备、BLE 设备和经典蓝牙可发现设备都会显示在这里" else "点击设备可选中，用于调试页和日志页"
+            title = "设备",
+            subtitle = if (devices.isEmpty()) "扫描后，点击设备进行选择" else "点击设备后确认选择"
         ) {
             if (devices.isEmpty()) {
-                Text("暂无设备", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "暂无设备",
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
             } else {
                 devices.forEach { device ->
                     DeviceRow(
@@ -132,58 +112,31 @@ fun DeviceScreen(
         }
     }
 
-    pendingDevice?.let { device ->
-        AlertDialog(
-            onDismissRequest = { pendingDevice = null },
-            title = { Text("连接设备", color = MaterialTheme.colorScheme.onSurface) },
-            text = { Text("是否连接 ${device.displayName}？", color = MaterialTheme.colorScheme.onSurface) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        controller.selectDevice(device)
-                        pendingDevice = null
-                    },
-                    colors = appFilledButtonColors()
-                ) { Text("连接") }
-            },
-            dismissButton = {
-                OutlinedButton(
-                    onClick = { pendingDevice = null },
-                    colors = appOutlinedButtonColors(),
-                    border = appOutlinedButtonBorder(enabled = true)
-                ) { Text("取消") }
-            }
-        )
-    }
-}
-
-@Composable
-fun DeviceOverviewStrip(deviceCount: Int, status: String, pairedCount: Int) {
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.16f))
+    val device = pendingDevice
+    SuperDialog(
+        title = "选择设备",
+        summary = device?.let { "使用 ${it.displayName} 进行蓝牙通信？" },
+        show = device != null,
+        onDismissRequest = { pendingDevice = null }
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("附近设备", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(status, fontWeight = FontWeight.SemiBold)
-            }
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    deviceCount.toString().padStart(2, '0'),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text("已配对 $pairedCount", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            TextButton(
+                text = "取消",
+                onClick = { pendingDevice = null },
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(
+                text = "选择",
+                onClick = {
+                    device?.let(controller::selectDevice)
+                    pendingDevice = null
+                },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.textButtonColorsPrimary()
+            )
         }
     }
 }
@@ -191,23 +144,25 @@ fun DeviceOverviewStrip(deviceCount: Int, status: String, pairedCount: Int) {
 @Composable
 fun DeviceRow(device: BleScanItem, selected: Boolean, onClick: () -> Unit) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else androidx.compose.ui.graphics.Color.Transparent,
-        contentColor = MaterialTheme.colorScheme.onSurface
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = if (selected) {
+            MiuixTheme.colorScheme.primaryContainer
+        } else {
+            MiuixTheme.colorScheme.secondaryContainer
+        }
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Text(
                     text = device.displayName,
@@ -217,34 +172,27 @@ fun DeviceRow(device: BleScanItem, selected: Boolean, onClick: () -> Unit) {
                 )
                 Text(
                     text = "${device.transport} · ${device.address}",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    style = MiuixTheme.textStyles.body2,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
             Column(
-                modifier = Modifier.requiredWidth(92.dp),
+                modifier = Modifier.requiredWidth(82.dp),
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Text(
                     text = device.rssiLabel,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Clip,
+                    color = MiuixTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.End
                 )
                 Text(
-                    text = when {
-                        selected -> "已选中"
-                        device.isBonded -> "已配对"
-                        device.isConnectable -> "可连接"
-                        else -> "广播中"
-                    },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    text = if (selected) "已选择" else if (device.isBonded) "已配对" else "可用",
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    style = MiuixTheme.textStyles.body2,
                     textAlign = TextAlign.End
                 )
             }
