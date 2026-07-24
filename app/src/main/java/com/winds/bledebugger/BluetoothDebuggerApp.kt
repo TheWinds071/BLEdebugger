@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -160,33 +161,49 @@ fun BluetoothDebuggerApp() {
             val update = availableUpdate
             SuperDialog(
                 title = update?.let { "发现新版本 ${it.tagName}" },
-                summary = update?.releaseNotes?.ifBlank { "新版本已经发布，是否前往下载？" },
                 show = update != null,
                 onDismissRequest = { availableUpdate = null }
             ) {
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    TextButton(
-                        text = "稍后",
-                        onClick = { availableUpdate = null },
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(
-                        text = "前往下载",
-                        onClick = {
-                            val releaseUrl = update?.releaseUrl ?: return@TextButton
-                            availableUpdate = null
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl))
-                                )
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.textButtonColorsPrimary()
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 320.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        MarkdownReleaseNotes(
+                            markdown = update?.releaseNotes
+                                ?.ifBlank { "新版本已经发布，是否前往下载？" }
+                                .orEmpty()
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        TextButton(
+                            text = "稍后",
+                            onClick = { availableUpdate = null },
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(
+                            text = "前往下载",
+                            onClick = {
+                                val releaseUrl = update?.releaseUrl ?: return@TextButton
+                                availableUpdate = null
+                                runCatching {
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl))
+                                    )
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.textButtonColorsPrimary()
+                        )
+                    }
                 }
             }
         }

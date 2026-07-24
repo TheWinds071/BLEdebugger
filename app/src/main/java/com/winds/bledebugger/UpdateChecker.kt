@@ -14,6 +14,7 @@ data class ReleaseUpdate(
 )
 
 object UpdateChecker {
+    private const val MAX_RELEASE_NOTES_LENGTH = 20_000
     private const val LATEST_RELEASE_API =
         "https://api.github.com/repos/TheWinds071/BLEdebugger/releases/latest"
     private const val RELEASES_PAGE =
@@ -50,7 +51,9 @@ object UpdateChecker {
 
             ReleaseUpdate(
                 tagName = tagName,
-                releaseNotes = release.optString("body").trim().take(800),
+                releaseNotes = release.optString("body")
+                    .trim()
+                    .take(MAX_RELEASE_NOTES_LENGTH),
                 releaseUrl = release.optString("html_url", RELEASES_PAGE)
                     .takeIf { it.startsWith("https://github.com/") }
                     ?: RELEASES_PAGE
