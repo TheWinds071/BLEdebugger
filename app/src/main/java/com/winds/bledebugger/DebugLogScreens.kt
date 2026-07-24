@@ -120,7 +120,16 @@ private fun FormatButton(text: String, selected: Boolean, modifier: Modifier, on
         modifier = modifier,
         colors = if (selected) ButtonDefaults.buttonColorsPrimary() else ButtonDefaults.buttonColors(),
         cornerRadius = 14.dp
-    ) { Text(text) }
+    ) {
+        Text(
+            text = text,
+            color = if (selected) {
+                MiuixTheme.colorScheme.onPrimary
+            } else {
+                MiuixTheme.colorScheme.onSecondaryContainer
+            }
+        )
+    }
 }
 
 @Composable

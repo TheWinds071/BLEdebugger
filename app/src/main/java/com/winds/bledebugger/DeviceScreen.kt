@@ -160,6 +160,17 @@ fun DeviceScreen(
 
 @Composable
 fun DeviceRow(device: BleScanItem, selected: Boolean, onClick: () -> Unit) {
+    val primaryTextColor = if (selected) {
+        MiuixTheme.colorScheme.onPrimaryContainer
+    } else {
+        MiuixTheme.colorScheme.onSurface
+    }
+    val secondaryTextColor = if (selected) {
+        MiuixTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f)
+    } else {
+        MiuixTheme.colorScheme.onSurfaceVariantSummary
+    }
+
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -183,13 +194,14 @@ fun DeviceRow(device: BleScanItem, selected: Boolean, onClick: () -> Unit) {
             ) {
                 Text(
                     text = device.displayName,
+                    color = primaryTextColor,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "${device.transport} · ${device.address}",
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    color = secondaryTextColor,
                     style = MiuixTheme.textStyles.body2,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -202,13 +214,13 @@ fun DeviceRow(device: BleScanItem, selected: Boolean, onClick: () -> Unit) {
             ) {
                 Text(
                     text = device.rssiLabel,
-                    color = MiuixTheme.colorScheme.primary,
+                    color = if (selected) primaryTextColor else MiuixTheme.colorScheme.primary,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.End
                 )
                 Text(
                     text = if (selected) "已选择" else if (device.isBonded) "已配对" else "可用",
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    color = secondaryTextColor,
                     style = MiuixTheme.textStyles.body2,
                     textAlign = TextAlign.End
                 )
