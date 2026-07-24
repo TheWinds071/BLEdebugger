@@ -58,19 +58,19 @@ fun MarkdownReleaseNotes(markdown: String, modifier: Modifier = Modifier) {
             when (block.type) {
                 MarkdownBlockType.Heading1 -> Text(
                     text = inlineMarkdown(block.text, primaryColor, codeBackground),
-                    style = MiuixTheme.textStyles.title1,
+                    style = MiuixTheme.textStyles.title4,
                     fontWeight = FontWeight.Bold
                 )
 
                 MarkdownBlockType.Heading2 -> Text(
                     text = inlineMarkdown(block.text, primaryColor, codeBackground),
-                    style = MiuixTheme.textStyles.title2,
+                    style = MiuixTheme.textStyles.headline1,
                     fontWeight = FontWeight.Bold
                 )
 
                 MarkdownBlockType.Heading3 -> Text(
                     text = inlineMarkdown(block.text, primaryColor, codeBackground),
-                    style = MiuixTheme.textStyles.title3,
+                    style = MiuixTheme.textStyles.headline2,
                     fontWeight = FontWeight.SemiBold
                 )
 
