@@ -19,8 +19,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import androidx.annotation.DrawableRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -56,6 +58,8 @@ class BleController(private val context: Context) {
     var isScannerAvailable by mutableStateOf(false)
         private set
     var isClassicDiscovering by mutableStateOf(false)
+        private set
+    var isLocationEnabled by mutableStateOf(isLocationServiceEnabled())
         private set
     var bondedDeviceCount by mutableStateOf(0)
         private set
@@ -175,8 +179,10 @@ class BleController(private val context: Context) {
         }
 
         override fun onScanFailed(errorCode: Int) {
-            isScanning = false
-            appendLog("ERR", "扫描启动失败，错误码=$errorCode")
+            mainHandler.post {
+                isScanning = isClassicDiscovering
+                appendLog("ERR", "BLE 扫描启动失败：${explainScanFailure(errorCode)}")
+            }
         }
     }
 
@@ -344,6 +350,7 @@ class BleController(private val context: Context) {
     fun refreshState() {
         val currentAdapter = adapter
         isBluetoothSupported = currentAdapter != null
+        isLocationEnabled = isLocationServiceEnabled()
         if (!hasRequiredPermissions()) {
             isBluetoothEnabled = false
             isScannerAvailable = false
@@ -385,6 +392,9 @@ class BleController(private val context: Context) {
         if (!isBluetoothEnabled) {
             appendLog("ERR", "蓝牙未开启")
             return
+        }
+        if (!isLocationEnabled) {
+            appendLog("ERR", "定位服务未开启")
         }
         if (isScanning) return
 
@@ -714,6 +724,19 @@ class BleController(private val context: Context) {
         }
     }
 
+    fun openLocationSettings() {
+        context.startActivity(
+            Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        )
+    }
+
+    private fun isLocationServiceEnabled(): Boolean {
+        val locationManager = context.getSystemService(LocationManager::class.java)
+        return locationManager?.isLocationEnabled == true
+    }
+
     private fun updateGattCharacteristics(gatt: BluetoothGatt) {
         val items = gatt.services.flatMap { service ->
             service.characteristics.map { characteristic ->
@@ -930,7 +953,8 @@ enum class SendMode {
 
 val BLE_PERMISSIONS = arrayOf(
     Manifest.permission.BLUETOOTH_SCAN,
-    Manifest.permission.BLUETOOTH_CONNECT
+    Manifest.permission.BLUETOOTH_CONNECT,
+    Manifest.permission.ACCESS_FINE_LOCATION
 )
 
 val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
@@ -979,5 +1003,17 @@ fun explainGattStatus(status: Int): String {
         13 -> "属性长度无效，通常是写入内容超过当前 MTU 可承载长度"
         BluetoothGatt.GATT_SUCCESS -> "成功"
         else -> "GATT 状态码 $status"
+    }
+}
+
+fun explainScanFailure(errorCode: Int): String {
+    return when (errorCode) {
+        ScanCallback.SCAN_FAILED_ALREADY_STARTED -> "扫描已经启动"
+        ScanCallback.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED -> "系统无法注册扫描器"
+        ScanCallback.SCAN_FAILED_INTERNAL_ERROR -> "蓝牙系统内部错误"
+        ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED -> "设备不支持当前扫描功能"
+        ScanCallback.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES -> "蓝牙硬件资源不足"
+        ScanCallback.SCAN_FAILED_SCANNING_TOO_FREQUENTLY -> "操作过于频繁，请稍后重试"
+        else -> "错误码 $errorCode"
     }
 }

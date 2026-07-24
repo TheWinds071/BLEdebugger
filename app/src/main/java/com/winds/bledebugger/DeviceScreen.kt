@@ -83,6 +83,7 @@ fun DeviceScreen(
                         when {
                             !controller.hasRequiredPermissions() -> onRequestPermissions()
                             !controller.isBluetoothEnabled -> onRequestEnableBluetooth()
+                            !controller.isLocationEnabled -> controller.openLocationSettings()
                             controller.isScanning -> controller.stopScan()
                             else -> {
                                 controller.clearResults()
@@ -104,8 +105,10 @@ fun DeviceScreen(
                         !controller.isBluetoothSupported -> "当前设备不支持蓝牙"
                         !controller.hasRequiredPermissions() -> "点击右上角刷新并授权蓝牙"
                         !controller.isBluetoothEnabled -> "点击右上角刷新并开启蓝牙"
+                        !controller.isLocationEnabled -> "点击右上角刷新并开启定位服务"
                         controller.isScanning -> "正在搜索设备…"
-                        devices.isNotEmpty() -> "未发现有名称的设备"
+                        devices.isNotEmpty() ->
+                            "已发现 ${devices.size} 个未命名设备，点击右上角显示"
                         else -> "点击右上角刷新设备"
                     },
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
